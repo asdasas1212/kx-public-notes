@@ -19,6 +19,8 @@ GitHub Pages 的发布来源设置为 `main` 分支的 `/docs` 目录。提交�
 
 ## 当前环境的发布命令
 
+本机目录是通过 API 发布的工作副本；需要普通 Git 工作流时，可在 Git 网络可用的环境克隆此仓库。
+
 当前网络的 Git HTTPS 推送返回 HTTP 602，因此随项目提供 `publish_github.py`，通过 GitHub 官方 API 将变更保存为版本提交，并自动触发 Pages 发布：
 
 ```sh
