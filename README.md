@@ -15,7 +15,18 @@ GitHub Pages 的发布来源设置为 `main` 分支的 `/docs` 目录。提交�
 
 更新流程：修改内容 → 本地预览 → 提交并推送 → 等待 Pages 发布完成 → 检查线上页面。
 
-恢复旧版本时使用 `git revert` 创建恢复提交并推送，保留完整历史。自定义域名可稍后在仓库 Settings → Pages 中设置。
+普通 Git 网络可用时，可以克隆本仓库，正常提交和推送；恢复旧版本使用 `git revert`。自定义域名可稍后在仓库 Settings → Pages 中设置，绑定后需将 `build_site.py` 中 404 页的 base 路径调整为域名对应根路径。
+
+## 当前环境的发布命令
+
+当前网络的 Git HTTPS 推送返回 HTTP 602，因此随项目提供 `publish_github.py`，通过 GitHub 官方 API 将变更保存为版本提交，并自动触发 Pages 发布：
+
+```sh
+python3 build_site.py
+python3 publish_github.py
+```
+
+脚本复用 Git 的现有 GitHub 登录，不包含令牌，不把凭证上传到仓库；限定操作本网站仓库。它会保留远端版本历史，重复执行且没有内容变更时不会创建提交。远端在上传期间发生新提交时会停止分支更新。也可以直接在 GitHub 网页上编辑 `docs/` 中的页面，提交后同样自动发布。
 
 ## 数据与资源
 
