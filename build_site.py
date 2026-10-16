@@ -1,0 +1,48 @@
+from pathlib import Path
+import html,json,re,shutil
+root=Path(__file__).parent/'docs';(root/'notes').mkdir(exist_ok=True)
+posts=[
+ {'slug':'read-ai-news','title':'读 AI 消息，先看证据','topic':'AI','summary':'模型发布很热闹，先分清官方说明、可复现实验和未经验证的判断。','body':[
+ ('先找到原始发布','遇到一条吸引人的 AI 消息，先沿着链接找到发布方的文档、论文或代码。转述可以帮忙发现线索，但型号、许可、使用条件和实验设置应回到原始材料核对。把来源和查看日期一起记下来，后面才知道哪些结论已经过时。'),
+ ('把演示拆成问题','一段成功演示证明某次运行成功了，却未必说明系统在你的输入上同样可靠。继续问：输入是什么？失败案例有没有展示？有没有可以下载的模型、数据或运行脚本？若只有剪辑好的视频，就先把它当作观察线索。'),
+ ('给自己留一个小实验','选择一个能在现有资源上运行的任务，固定输入、记录版本、保留输出，再尝试一个容易失败的例子。先验证它能不能解决一个具体问题，再讨论是否值得投入更多时间。没有实际跑过的部分，明确标为未验证。'),
+ ('一张实用的阅读清单','记下六件事：来源、发布日期、可以使用的产物、使用条件、复现需要的资源、还没得到回答的问题。这样的笔记更适合日后回看，也能避免把“看过发布”误认为“已经掌握”。')], 'sources':[('Hugging Face 文档入口','https://huggingface.co/docs'),('GitHub 开源项目入口','https://github.com/explore')]},
+ {'slug':'csv-before-model','title':'训练之前，先检查 CSV','topic':'数据','summary':'缺失、重复和时间倒序，应该在它们进入训练与回测之前被看见。','body':[
+ ('从结构开始','首先确认编码、分隔符与列名。一个文件能被表格软件打开，不代表每一行都有相同列数。空列名、重复列名和引号里的换行，都可能改变后续程序对字段的理解。检查应保留原始行号，方便回到源数据定位。'),
+ ('重复不止一种','整行重复与“同一资产、同一时间”的重复是两件事。前者可能来自重复导出，后者需要结合业务判断是否允许同一时刻出现多个记录。检测到重复之后先核对来源，不要直接删除所有重复项。'),
+ ('时间要放回分组里','不同资产或不同 episode 的记录可以交错出现。检查时间顺序时，应先确定分组列，再判断每组内部是否有倒序。秒、毫秒和日期字符串也应明确区分，避免把单位问题误当成异常。'),
+ ('检查也有边界','DataAudit 可以检查表格结构、部分数值规则与时间顺序，但无法证明数据真实，更不能证明策略有收益或机器人动作安全。把已执行规则与跳过项一起导出，比一个笼统的“通过”更有用。')], 'sources':[('试用本站 DataAudit','../tools/dataaudit/index.html')]},
+ {'slug':'quant-data-first','title':'回测之前，把数据对齐','topic':'量化','summary':'先把时间、分组和字段含义说清楚，再判断一条曲线有没有解释力。','body':[
+ ('先定义一行的含义','一行是一次成交、一根 K 线，还是某个时刻的截面？先固定资产标识、时区、频率和价格口径。不同口径的数据即使列名相同，也不适合直接拼接。把这些假设写在数据旁边，后续实验才有共同的起点。'),
+ ('排序不等于修复','把时间重新排序，可以让记录按时间排列，却不能补回缺失的数据，也不能解决重复时间对应的冲突。先列出问题，再决定如何处理；保留原文件，并记录每次变换的规则。'),
+ ('不要只保存最后结果','除了结果表，也保留输入文件指纹、字段映射、时间范围和规则版本。这样发现问题时，才能区分它来自原始数据、预处理，还是后续分析。本站小工具的 JSON 报告就是一种轻量记录方式。'),
+ ('从数据工具开始学习','Qlib 等开源研究框架可以作为了解数据与实验流程的入口。本篇只讨论数据整理，不推荐具体交易，也不把任何示例或历史回测当作未来收益承诺。先让一次实验可以复查，再考虑让实验更复杂。')], 'sources':[('Microsoft Qlib 官方仓库','https://github.com/microsoft/qlib'),('打开 CSV 检查工具','../tools/dataaudit/index.html')]},
+ {'slug':'vla-without-hardware','title':'没有机器人，怎么学 VLA','topic':'机器人','summary':'从数据结构和公开示例入手，先理解视觉、语言与动作如何对应。','body':[
+ ('先理解数据如何成组','VLA 指视觉—语言—动作模型。入门时可以先观察一段任务示例：画面记录了什么，任务描述说了什么，动作以什么形式保存。把这些量的时间关系讲清楚，比先追逐模型规模更有帮助。'),
+ ('用已有工具认识流程','LeRobot 提供数据集、策略训练与部署相关工具，官方文档也列出了不持有机器人时可走的学习路线。可以从公开数据和已有 notebook 开始，先读懂输入输出，再决定是否配置训练环境。'),
+ ('先检查 episode 元信息','把 episode 标识、帧号和时间戳单独拿出来，检查组内顺序、重复帧和不连续的帧号。本站 DataAudit 的 episode 示例能演示这一层检查；它不解析视频内容，也不分析动作张量。'),
+ ('把边界记下来','观察数据、离线评估和真实硬件执行是不同阶段。看懂数据检查结果，不代表策略能够在真实环境中可靠执行。把已验证和未验证部分分别记下来，下一次实验才知道从哪里继续。')], 'sources':[('LeRobot 官方文档','https://huggingface.co/docs/lerobot/en/index'),('LeRobot 数据集说明','https://huggingface.co/docs/lerobot/en/lerobot-dataset-v3')]}
+]
+def esc(s):return html.escape(s,quote=True)
+def header(prefix=''):
+ return f'''<a class="skip-link" href="#main">跳到正文</a><header class="site-header"><a class="wordmark" href="{prefix}index.html" aria-label="KX 笔记首页">KX<span>公开笔记</span></a><nav aria-label="主导航"><a href="{prefix}index.html#notes">笔记</a><a href="{prefix}index.html#projects">项目</a><a href="{prefix}index.html#about">关于</a></nav></header>'''
+def head(title,description,prefix=''):
+ return f'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="{esc(description)}"><meta name="theme-color" content="#0a0a0a"><meta property="og:title" content="{esc(title)}"><meta property="og:description" content="{esc(description)}"><meta property="og:type" content="website"><title>{esc(title)}</title><link rel="icon" href="{prefix}assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="{prefix}style.css"><script src="{prefix}site.js" defer></script></head><body>'''
+def foot(prefix=''):
+ return f'''<footer class="site-footer"><a class="footer-name" href="{prefix}index.html">KX</a><div class="footer-bottom"><p>关于 AI、数据与机器人的公开笔记。<br>首批文章由 AI 辅助整理，参考来源见文末。</p><a href="#top">回到顶部</a></div></footer></body></html>'''
+rows=''.join(f'''<article class="note-row reveal" data-topic="{esc(p['topic'])}" data-search="{esc(p['title']+' '+p['summary']+' '+p['topic'])}"><a class="note-link" href="notes/{p['slug']}.html"><h3>{p['title']}</h3><p>{p['summary']}</p></a><span class="note-topic">{p['topic']}</span></article>''' for p in posts)
+index=head('KX 笔记 · 把想法做出来','关于 AI、量化数据与机器人 VLA 的公开笔记，附可运行的 CSV 检查小工具。')+'''<div id="top"></div>'''+header()+'''<main id="main"><section class="hero" aria-labelledby="hero-title"><h1 id="hero-title"><span class="hero-line"><span>把想法</span></span><span class="hero-line"><span>做出来。</span></span></h1><div class="hero-bottom"><p class="hero-copy">这里是 KX 的公开笔记。<br>记录 AI、数据与机器人，也留下一些能用的小工具。</p><a class="primary" href="#notes">开始阅读 <span aria-hidden="true">↗</span></a></div></section>
+<section class="notes-section section" id="notes" aria-labelledby="notes-title"><div class="section-side reveal"><h2 id="notes-title">最近的笔记</h2><p>从一个具体问题开始，<br>把资料和方法留下来。</p></div><div class="notes-main"><form class="note-tools reveal" role="search"><label for="note-search">找一篇笔记</label><input id="note-search" type="search" placeholder="搜索标题或关键词" autocomplete="off"><fieldset><legend>按主题阅读</legend><div class="filters"><button type="button" data-filter="全部" aria-pressed="true">全部</button><button type="button" data-filter="AI" aria-pressed="false">AI</button><button type="button" data-filter="数据" aria-pressed="false">数据</button><button type="button" data-filter="量化" aria-pressed="false">量化</button><button type="button" data-filter="机器人" aria-pressed="false">机器人</button></div></fieldset></form><p class="search-status" role="status" aria-live="polite">共 4 篇笔记</p><div class="note-list">'''+rows+'''</div><p class="search-empty" hidden>没有找到对应笔记，试试其他关键词，或选择“全部”。</p><noscript><p>浏览器未启用脚本，仍可打开下方所有文章；主题筛选需启用脚本。</p></noscript></div></section>
+<section class="project-section section" id="projects" aria-labelledby="projects-title"><div class="project-intro"><h2 class="reveal" id="projects-title">一个能用的小工具</h2><div class="project-copy reveal"><h3>DataAudit</h3><p>把 CSV 放进浏览器，找到缺失值、重复记录和时间倒序，再带走一份有原始行号的报告。</p><p>支持普通表格、行情 OHLC 和机器人 episode 元信息。数据在本机处理。</p><a class="text-link" href="tools/dataaudit/index.html">打开数据检查工具</a></div></div><div class="project-pictures"><figure class="project-picture picture-large reveal"><img src="assets/market-report.jpg" alt="DataAudit 行情示例的实际检查报告，显示重复时间与无效数值问题" width="690" height="690" loading="lazy"><figcaption>行情示例的真实检查结果</figcaption></figure><figure class="project-picture picture-small reveal"><img src="assets/market-setup.jpg" alt="DataAudit 行情检查中的字段映射与设置界面" width="300" height="650" loading="lazy"><figcaption>按字段配置检查</figcaption></figure><figure class="project-picture picture-small reveal"><img src="assets/episode-setup.jpg" alt="DataAudit episode 示例中的帧号和时间设置界面" width="300" height="650" loading="lazy"><figcaption>保留 episode 分组</figcaption></figure><figure class="project-picture picture-large reveal"><img src="assets/episode-report.jpg" alt="DataAudit episode 检查报告，显示示例数据中的帧号和缺失问题" width="690" height="690" loading="lazy"><figcaption>把问题定位到原始行号</figcaption></figure></div><p class="project-limit reveal">截图来自工具内置演示数据。检查结果只说明已配置规则发现的问题，不证明收益或动作安全。</p></section>
+<section class="about-section section" id="about" aria-labelledby="about-title"><div class="about-side reveal"><h2 id="about-title">关于这里</h2><dl><div><dt>关注</dt><dd>AI、数据、机器人</dd></div><div><dt>方式</dt><dd>读资料，也动手试</dd></div></dl></div><div class="about-copy"><p class="about-statement reveal">先把问题问清楚，<br>再做一个小实验。</p><p class="reveal">这里整理值得继续追问的技术问题：怎样读懂一条 AI 发布，怎样检查一份数据，以及怎样迈出机器人学习的第一步。</p><p class="reveal">每篇笔记尽量留下来源、步骤和适用边界。项目可以直接打开体验；暂未验证的部分，也会如实说明。</p></div></section></main>'''+foot()
+(root/'index.html').write_text(index)
+for p in posts:
+ body=''.join(f'<section class="article-part"><h2>{esc(t)}</h2><p>{esc(b)}</p></section>' for t,b in p['body'])
+ sources=''.join(f'<li><a href="{esc(url)}"'+(' target="_blank" rel="noopener noreferrer"' if url.startswith('http') else '')+f'>{esc(label)}</a></li>' for label,url in p['sources'])
+ doc=head(p['title']+' · KX 笔记',p['summary'],'../')+'<div id="top"></div>'+header('../')+f'''<main id="main" class="article-main"><a class="article-back" href="../index.html#notes">返回全部笔记</a><article><header class="article-header"><h1>{esc(p['title'])}</h1><p class="article-summary">{esc(p['summary'])}</p><p class="article-meta">{esc(p['topic'])} · 入门笔记 · <time datetime="2026-10-15">2026 年 10 月 15 日</time></p></header><div class="article-body">{body}<section class="article-part article-sources"><h2>继续阅读</h2><ul>{sources}</ul></section><p class="article-disclosure">本文为 AI 辅助整理的起始笔记，用于学习与实验。涉及投资与机器人执行时，请结合实际数据、条件和原始文档判断。</p></div></article><a class="article-back" href="../index.html#notes">继续看其他笔记</a></main>'''+foot('../')
+ (root/'notes'/f"{p['slug']}.html").write_text(doc)
+(root/'assets/favicon.svg').write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#0a0a0a"/><path d="M16 15v34m0-16 16-18m-16 18 17 16m6-34 12 34m0-34L39 49" stroke="#efefef" stroke-width="4" fill="none"/></svg>')
+(root/'404.html').write_text(head('页面未找到 · KX 笔记','返回 KX 公开笔记。')+header()+'<main id="main" class="not-found"><h1>这一页还没写下。</h1><p>链接可能有误，也可能已经移动。</p><a class="primary" href="/index.html">回到首页</a></main>'+foot())
+(root/'robots.txt').write_text('User-agent: *\nAllow: /\n')
+(root/'_headers').write_text('/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n')
+print('Built home, 4 full articles, 404 and static assets.')
